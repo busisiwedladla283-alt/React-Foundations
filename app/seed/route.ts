@@ -1,3 +1,4 @@
+
 import bcrypt from 'bcrypt';
 import postgres from 'postgres';
 import {
@@ -7,15 +8,14 @@ import {
   users,
 } from '../lib/placeholder-data';
 
-const sql = postgres(process.env.POSTGRES_URL!, {
-  ssl: 'require',
-  prepare: false,
-});
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
-async function seedUsers() {
-  await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+async function seedUsers(db: typeof sql) {
+  await db`
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+  `;
 
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS users (
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -27,49 +27,18 @@ async function seedUsers() {
   for (const user of users) {
     const hashedPassword = await bcrypt.hash(user.password, 10);
 
-    await sql`
+    await db`
       INSERT INTO users (id, name, email, password)
-      VALUES (
-        ${user.id},
-        ${user.name},
-        ${user.email},
-        ${hashedPassword}
-      )
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (${user.id}, ${user.name}, ${user.email}, ${hashedPassword})
+      ON CONFLICT DO NOTHING;
     `;
   }
 }
 
-async function seedCustomers() {
-  await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+async function seedInvoices(db: typeof sql) {
+  await db`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS customers (
-      id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      email VARCHAR(255) NOT NULL,
-      image_url VARCHAR(255) NOT NULL
-    );
-  `;
-
-  for (const customer of customers) {
-    await sql`
-      INSERT INTO customers (id, name, email, image_url)
-      VALUES (
-        ${customer.id},
-        ${customer.name},
-        ${customer.email},
-        ${customer.image_url}
-      )
-      ON CONFLICT (id) DO NOTHING;
-    `;
-  }
-}
-
-async function seedInvoices() {
-  await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
-
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS invoices (
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
       customer_id UUID NOT NULL,
@@ -80,7 +49,7 @@ async function seedInvoices() {
   `;
 
   for (const invoice of invoices) {
-    await sql`
+    await db`
       INSERT INTO invoices (customer_id, amount, status, date)
       VALUES (
         ${invoice.customer_id},
@@ -88,13 +57,39 @@ async function seedInvoices() {
         ${invoice.status},
         ${invoice.date}
       )
-      ON CONFLICT (id) DO NOTHING;
+      ON CONFLICT DO NOTHING;
     `;
   }
 }
 
-async function seedRevenue() {
-  await sql`
+async function seedCustomers(db: typeof sql) {
+  await db`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+
+  await db`
+    CREATE TABLE IF NOT EXISTS customers (
+      id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      image_url VARCHAR(255) NOT NULL
+    );
+  `;
+
+  for (const customer of customers) {
+    await db`
+      INSERT INTO customers (id, name, email, image_url)
+      VALUES (
+        ${customer.id},
+        ${customer.name},
+        ${customer.email},
+        ${customer.image_url}
+      )
+      ON CONFLICT DO NOTHING;
+    `;
+  }
+}
+
+async function seedRevenue(db: typeof sql) {
+  await db`
     CREATE TABLE IF NOT EXISTS revenue (
       month VARCHAR(4) NOT NULL UNIQUE,
       revenue INT NOT NULL
@@ -102,7 +97,7 @@ async function seedRevenue() {
   `;
 
   for (const rev of revenue) {
-    await sql`
+    await db`
       INSERT INTO revenue (month, revenue)
       VALUES (${rev.month}, ${rev.revenue})
       ON CONFLICT (month) DO NOTHING;
@@ -112,11 +107,12 @@ async function seedRevenue() {
 
 export async function GET() {
   try {
-    // Seed tables sequentially to reduce database concurrency.
-    await seedUsers();
-    await seedCustomers();
-    await seedInvoices();
-    await seedRevenue();
+    await sql.begin(async (tx) => {
+      await seedUsers(tx);
+      await seedCustomers(tx);
+      await seedInvoices(tx);
+      await seedRevenue(tx);
+    });
 
     return Response.json({
       message: 'Database seeded successfully',
@@ -129,7 +125,7 @@ export async function GET() {
         error:
           error instanceof Error
             ? error.message
-            : 'An unknown error occurred while seeding the database',
+            : 'An unknown database error occurred',
       },
       { status: 500 },
     );
