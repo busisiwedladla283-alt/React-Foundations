@@ -15,8 +15,9 @@ export default async function Page({
     page?: string;
   }>;
 }) {
-  const { query = '', page } = await searchParams;
-  const currentPage = Number(page) || 1;
+  const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams.query || '';
+  const currentPage = Number(resolvedSearchParams.page) || 1;
 
   const totalPages = await fetchInvoicesPages(query);
 
