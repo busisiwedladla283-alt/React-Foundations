@@ -11,14 +11,16 @@ import { formatCurrency } from './utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
+// Fetch revenue data
 export async function fetchRevenue() {
   try {
-    // Artificially delay a response for demo purposes.
-    // Don't do this in production :)
     console.log('Fetching revenue data...');
+
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const data = await sql<Revenue[]>`SELECT * FROM revenue`;
+    const data = await sql<Revenue[]>`
+      SELECT * FROM revenue
+    `;
 
     console.log('Data fetch completed after 3 seconds.');
 
@@ -29,6 +31,7 @@ export async function fetchRevenue() {
   }
 }
 
+// Fetch the five latest invoices
 export async function fetchLatestInvoices() {
   try {
     const data = await sql<LatestInvoiceRaw[]>`
@@ -44,6 +47,8 @@ export async function fetchLatestInvoices() {
       LIMIT 5
     `;
 
+    console.log('LATEST INVOICES:', data);
+
     const latestInvoices = data.map((invoice) => ({
       ...invoice,
       amount: formatCurrency(invoice.amount),
@@ -56,9 +61,9 @@ export async function fetchLatestInvoices() {
   }
 }
 
+// Fetch dashboard card data
 export async function fetchCardData() {
   try {
-    // Run the three database queries in parallel.
     const invoiceCountPromise = sql`
       SELECT COUNT(*) FROM invoices
     `;
@@ -82,6 +87,7 @@ export async function fetchCardData() {
 
     const numberOfInvoices = Number(data[0][0].count ?? '0');
     const numberOfCustomers = Number(data[1][0].count ?? '0');
+
     const totalPaidInvoices = formatCurrency(data[2][0].paid ?? '0');
     const totalPendingInvoices = formatCurrency(data[2][0].pending ?? '0');
 
@@ -97,8 +103,10 @@ export async function fetchCardData() {
   }
 }
 
+// Number of invoices displayed per page
 const ITEMS_PER_PAGE = 6;
 
+// Fetch filtered invoices
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
@@ -128,6 +136,8 @@ export async function fetchFilteredInvoices(
       OFFSET ${offset}
     `;
 
+    console.log('FILTERED INVOICES:', invoices);
+
     return invoices;
   } catch (error) {
     console.error('Database Error:', error);
@@ -135,6 +145,7 @@ export async function fetchFilteredInvoices(
   }
 }
 
+// Fetch total invoice pages
 export async function fetchInvoicesPages(query: string) {
   try {
     const data = await sql`
@@ -160,6 +171,7 @@ export async function fetchInvoicesPages(query: string) {
   }
 }
 
+// Fetch a single invoice by ID
 export async function fetchInvoiceById(id: string) {
   try {
     const data = await sql<InvoiceForm[]>`
@@ -174,7 +186,6 @@ export async function fetchInvoiceById(id: string) {
 
     const invoice = data.map((invoice) => ({
       ...invoice,
-      // Convert cents to dollars.
       amount: invoice.amount / 100,
     }));
 
@@ -185,6 +196,7 @@ export async function fetchInvoiceById(id: string) {
   }
 }
 
+// Fetch all customers for the invoice dropdown
 export async function fetchCustomers() {
   try {
     const customers = await sql<CustomerField[]>`
@@ -195,6 +207,8 @@ export async function fetchCustomers() {
       ORDER BY name ASC
     `;
 
+    console.log('CUSTOMERS FOR DROPDOWN:', customers);
+
     return customers;
   } catch (error) {
     console.error('Database Error:', error);
@@ -202,6 +216,7 @@ export async function fetchCustomers() {
   }
 }
 
+// Fetch customers with their invoice totals
 export async function fetchFilteredCustomers(query: string) {
   try {
     const data = await sql<CustomersTableType[]>`
@@ -224,7 +239,8 @@ export async function fetchFilteredCustomers(query: string) {
           END
         ) AS total_paid
       FROM customers
-      LEFT JOIN invoices ON customers.id = invoices.customer_id
+      LEFT JOIN invoices
+        ON customers.id = invoices.customer_id
       WHERE
         customers.name ILIKE ${`%${query}%`} OR
         customers.email ILIKE ${`%${query}%`}
@@ -236,10 +252,13 @@ export async function fetchFilteredCustomers(query: string) {
       ORDER BY customers.name ASC
     `;
 
+    console.log('CUSTOMERS RETURNED:', data);
+    console.log('TOTAL CUSTOMERS RETURNED:', data.length);
+
     const customers = data.map((customer) => ({
       ...customer,
-      total_pending: formatCurrency(customer.total_pending),
-      total_paid: formatCurrency(customer.total_paid),
+      total_pending: formatCurrency(customer.total_pending ?? 0),
+      total_paid: formatCurrency(customer.total_paid ?? 0),
     }));
 
     return customers;

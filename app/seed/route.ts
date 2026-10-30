@@ -51,13 +51,19 @@ async function seedInvoices(db: typeof sql) {
   for (const invoice of invoices) {
     await db`
       INSERT INTO invoices (customer_id, amount, status, date)
-      VALUES (
+      SELECT
         ${invoice.customer_id},
         ${invoice.amount},
         ${invoice.status},
         ${invoice.date}
-      )
-      ON CONFLICT DO NOTHING;
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM invoices
+        WHERE customer_id = ${invoice.customer_id}
+          AND amount = ${invoice.amount}
+          AND status = ${invoice.status}
+          AND date = ${invoice.date}
+      );
     `;
   }
 }
