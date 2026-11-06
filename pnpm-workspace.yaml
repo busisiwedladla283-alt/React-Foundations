@@ -3,5 +3,6 @@ packages:
 allowBuilds:
   bcrypt: true
   sharp: true
+  supabase: true
   unrs-resolver: true
 minimumReleaseAge: 2880
