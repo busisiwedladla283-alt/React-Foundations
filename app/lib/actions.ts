@@ -1,3 +1,4 @@
+
 'use server';
 
 import { z } from 'zod';
@@ -22,15 +23,24 @@ export type State = {
 // Invoice validation schema
 const FormSchema = z.object({
   id: z.string(),
+
   customerId: z
-  .string()
-  .min(1, { message: 'Please select a customer.' }),
+    .string()
+    .min(1, { message: 'Please select a customer.' }),
+
   amount: z.coerce
     .number()
-    .gt(0, { message: 'Please enter an amount greater than $0.' }),
+    .finite({ message: 'Please enter a valid amount.' })
+    .gt(0, { message: 'Please enter an amount greater than $0.' })
+    .refine(
+      (amount) => Number.isSafeInteger(Math.round(amount * 100)),
+      { message: 'The invoice amount is too large.' }
+    ),
+
   status: z.enum(['pending', 'paid'], {
     invalid_type_error: 'Please select an invoice status.',
   }),
+
   date: z.string(),
 });
 
@@ -45,6 +55,17 @@ const UpdateInvoice = FormSchema.omit({
   id: true,
   date: true,
 });
+
+// Convert dollars to cents safely
+function convertAmountToCents(amount: number): number | null {
+  const amountInCents = Math.round(amount * 100);
+
+  if (!Number.isSafeInteger(amountInCents)) {
+    return null;
+  }
+
+  return amountInCents;
+}
 
 // Create a new invoice
 export async function createInvoice(
@@ -67,7 +88,17 @@ export async function createInvoice(
 
   const { customerId, amount, status } = validatedFields.data;
 
-  const amountInCents = amount * 100;
+  const amountInCents = convertAmountToCents(amount);
+
+  if (amountInCents === null) {
+    return {
+      errors: {
+        amount: ['The invoice amount is too large.'],
+      },
+      message: 'Invalid invoice amount.',
+    };
+  }
+
   const date = new Date().toISOString().split('T')[0];
 
   try {
@@ -76,7 +107,8 @@ export async function createInvoice(
       VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
     `;
   } catch (error) {
-    console.error(error);
+    console.error('Create Invoice Error:', error);
+
     return {
       message: 'Database Error: Failed to Create Invoice.',
     };
@@ -108,7 +140,16 @@ export async function updateInvoice(
 
   const { customerId, amount, status } = validatedFields.data;
 
-  const amountInCents = amount * 100;
+  const amountInCents = convertAmountToCents(amount);
+
+  if (amountInCents === null) {
+    return {
+      errors: {
+        amount: ['The invoice amount is too large.'],
+      },
+      message: 'Invalid invoice amount.',
+    };
+  }
 
   try {
     await sql`
@@ -120,7 +161,8 @@ export async function updateInvoice(
       WHERE id = ${id}
     `;
   } catch (error) {
-    console.error(error);
+    console.error('Update Invoice Error:', error);
+
     return {
       message: 'Database Error: Failed to Update Invoice.',
     };
@@ -140,6 +182,7 @@ export async function deleteInvoice(id: string) {
   revalidatePath('/dashboard/invoices');
 }
 
+// Authenticate user
 export async function authenticate(
   prevState: string | undefined,
   formData: FormData,
@@ -159,4 +202,3 @@ export async function authenticate(
     throw error;
   }
 }
-
