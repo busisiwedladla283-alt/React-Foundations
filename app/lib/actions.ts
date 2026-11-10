@@ -202,3 +202,136 @@ export async function authenticate(
     throw error;
   }
 }
+
+// State returned by the customer actions
+export type CustomerState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+  };
+  message?: string | null;
+};
+
+// Customer validation schema
+const CustomerFormSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, { message: 'Please enter the customer name.' })
+    .max(100, { message: 'Name must be 100 characters or fewer.' }),
+
+  email: z
+    .string()
+    .trim()
+    .email({ message: 'Please enter a valid email address.' })
+    .max(255, { message: 'Email must be 255 characters or fewer.' }),
+});
+
+// Create a new customer
+export async function createCustomer(
+  prevState: CustomerState,
+  formData: FormData,
+) {
+  const validatedFields = CustomerFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Please correct the errors below.',
+    };
+  }
+
+  const { name, email } = validatedFields.data;
+
+  // Neutral default avatar for newly created customers
+  const imageUrl = '/customers/default-avatar.svg';
+
+  try {
+    await sql`
+      INSERT INTO customers (name, email, image_url)
+      VALUES (${name}, ${email}, ${imageUrl})
+    `;
+  } catch (error) {
+    console.error('Create Customer Error:', error);
+
+    return {
+      message: 'Database Error: Failed to Create Customer.',
+    };
+  }
+
+  revalidatePath('/dashboard/customers');
+  revalidatePath('/dashboard');
+
+  redirect('/dashboard/customers');
+}
+
+export type DeleteCustomerState = {
+  message?: string | null;
+  success?: boolean;
+};
+
+export async function deleteCustomer(
+  prevState: DeleteCustomerState,
+  formData: FormData,
+): Promise<DeleteCustomerState> {
+  const validatedId = z.string().uuid().safeParse(formData.get('id'));
+
+  if (!validatedId.success) {
+    return {
+      message: 'Invalid customer ID.',
+    };
+  }
+
+  const customerId = validatedId.data;
+
+  try {
+    // Delete only if the customer has no associated invoices.
+    const deleted = await sql`
+      DELETE FROM customers
+      WHERE id = ${customerId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM invoices
+          WHERE invoices.customer_id = customers.id
+        )
+      RETURNING id
+    `;
+
+    if (deleted.length === 0) {
+      const existingCustomer = await sql`
+        SELECT id
+        FROM customers
+        WHERE id = ${customerId}
+        LIMIT 1
+      `;
+
+      if (existingCustomer.length === 0) {
+        return {
+          message: 'Customer not found.',
+        };
+      }
+
+      return {
+        message:
+          'This customer has invoices and cannot be deleted. Handle their invoices first.',
+      };
+    }
+
+    revalidatePath('/dashboard/customers');
+    revalidatePath('/dashboard');
+
+    return {
+      success: true,
+      message: 'Customer deleted successfully.',
+    };
+  } catch (error) {
+    console.error('Delete Customer Error:', error);
+
+    return {
+      message: 'Database Error: Failed to Delete Customer.',
+    };
+  }
+}

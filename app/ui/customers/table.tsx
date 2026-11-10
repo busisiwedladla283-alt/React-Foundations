@@ -1,122 +1,220 @@
+
 import Image from 'next/image';
+import Link from 'next/link';
 import { lusitana } from '@/app/ui/fonts';
 import Search from '@/app/ui/search';
-import {
-  CustomersTableType,
-  FormattedCustomersTable,
-} from '@/app/lib/definitions';
+import { FormattedCustomersTable } from '@/app/lib/definitions';
+import DeleteCustomerButton from '@/app/ui/customers/delete-button';
 
-export default async function CustomersTable({
+export default function CustomersTable({
   customers,
 }: {
   customers: FormattedCustomersTable[];
 }) {
   return (
     <div className="w-full">
-      <h1 className={`${lusitana.className} mb-8 text-xl md:text-2xl`}>
-        Customers
-      </h1>
-      <Search placeholder="Search customers..." />
-      <div className="mt-6 flow-root">
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full align-middle">
-            <div className="overflow-hidden rounded-md bg-gray-50 p-2 md:pt-0">
-              <div className="md:hidden">
-                {customers?.map((customer) => (
-                  <div
-                    key={customer.id}
-                    className="mb-2 w-full rounded-md bg-white p-4"
-                  >
-                    <div className="flex items-center justify-between border-b pb-4">
+      {/* Page heading */}
+      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className={`${lusitana.className} text-2xl font-bold`}>
+            Customers
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage your customers and track their invoices.
+          </p>
+        </div>
+
+        <Link
+          href="/dashboard/customers/create"
+          className="flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+        >
+          <span className="text-lg">+</span>
+          Add Customer
+        </Link>
+      </div>
+
+      {/* Customer summary */}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+        <p className="text-sm text-gray-500">Total customers</p>
+        <p className="mt-2 text-3xl font-semibold">
+          {customers.length}
+        </p>
+      </div>
+
+      {/* Search */}
+      <Search placeholder="Search customers by name or email..." />
+
+      {/* Customer table */}
+      <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-5 py-4">
+          <h2 className="font-semibold text-gray-900">
+            All Customers
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            A list of your registered customers and their invoice activity.
+          </p>
+        </div>
+
+        {/* Mobile layout */}
+        <div className="divide-y divide-gray-200 md:hidden">
+          {customers.map((customer) => (
+            <div key={customer.id} className="p-5">
+              <div className="flex items-center gap-3">
+                <Image
+  src={customer.image_url}
+  className="rounded-full object-cover"
+  alt={`${customer.name}'s profile picture`}
+  width={44}
+  height={44}
+  unoptimized
+/>
+
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-900">
+                    {customer.name}
+                  </p>
+                  <p className="truncate text-sm text-gray-500">
+                    {customer.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Total invoices</p>
+                  <p className="mt-1 font-medium">
+                    {customer.total_invoices}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Total paid</p>
+                  <p className="mt-1 font-medium text-green-600">
+                    {customer.total_paid}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Pending</p>
+                  <p className="mt-1 font-medium text-orange-500">
+                    {customer.total_pending}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mobile actions */}
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <Link
+                  href={`/dashboard/invoices?query=${encodeURIComponent(customer.name)}`}
+                  className="inline-flex text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  View invoices →
+                </Link>
+
+                <DeleteCustomerButton
+                  customerId={customer.id}
+                  customerName={customer.name}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop layout */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-6 py-4 font-semibold">Customer</th>
+                <th className="px-6 py-4 font-semibold">Invoices</th>
+                <th className="px-6 py-4 font-semibold">Total paid</th>
+                <th className="px-6 py-4 font-semibold">Pending</th>
+                <th className="px-6 py-4 text-right font-semibold">Action</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-gray-100">
+              {customers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  className="transition-colors hover:bg-gray-50"
+                >
+                  <td className="whitespace-nowrap px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <Image
+  src={customer.image_url}
+  className="rounded-full object-cover"
+  alt={`${customer.name}'s profile picture`}
+  width={40}
+  height={40}
+  unoptimized
+/>
+
                       <div>
-                        <div className="mb-2 flex items-center">
-                          <div className="flex items-center gap-3">
-                            <Image
-                              src={customer.image_url}
-                              className="rounded-full"
-                              alt={`${customer.name}'s profile picture`}
-                              width={28}
-                              height={28}
-                            />
-                            <p>{customer.name}</p>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-500">
+                        <p className="font-medium text-gray-900">
+                          {customer.name}
+                        </p>
+                        <p className="mt-1 text-gray-500">
                           {customer.email}
                         </p>
                       </div>
                     </div>
-                    <div className="flex w-full items-center justify-between border-b py-5">
-                      <div className="flex w-1/2 flex-col">
-                        <p className="text-xs">Pending</p>
-                        <p className="font-medium">{customer.total_pending}</p>
-                      </div>
-                      <div className="flex w-1/2 flex-col">
-                        <p className="text-xs">Paid</p>
-                        <p className="font-medium">{customer.total_paid}</p>
-                      </div>
-                    </div>
-                    <div className="pt-4 text-sm">
-                      <p>{customer.total_invoices} invoices</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <table className="hidden min-w-full rounded-md text-gray-900 md:table">
-                <thead className="rounded-md bg-gray-50 text-left text-sm font-normal">
-                  <tr>
-                    <th scope="col" className="px-4 py-5 font-medium sm:pl-6">
-                      Name
-                    </th>
-                    <th scope="col" className="px-3 py-5 font-medium">
-                      Email
-                    </th>
-                    <th scope="col" className="px-3 py-5 font-medium">
-                      Total Invoices
-                    </th>
-                    <th scope="col" className="px-3 py-5 font-medium">
-                      Total Pending
-                    </th>
-                    <th scope="col" className="px-4 py-5 font-medium">
-                      Total Paid
-                    </th>
-                  </tr>
-                </thead>
+                  </td>
 
-                <tbody className="divide-y divide-gray-200 text-gray-900">
-                  {customers.map((customer) => (
-                    <tr key={customer.id} className="group">
-                      <td className="whitespace-nowrap bg-white py-5 pl-4 pr-3 text-sm text-black group-first-of-type:rounded-md group-last-of-type:rounded-md sm:pl-6">
-                        <div className="flex items-center gap-3">
-                          <Image
-                            src={customer.image_url}
-                            className="rounded-full"
-                            alt={`${customer.name}'s profile picture`}
-                            width={28}
-                            height={28}
-                          />
-                          <p>{customer.name}</p>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap bg-white px-4 py-5 text-sm">
-                        {customer.email}
-                      </td>
-                      <td className="whitespace-nowrap bg-white px-4 py-5 text-sm">
-                        {customer.total_invoices}
-                      </td>
-                      <td className="whitespace-nowrap bg-white px-4 py-5 text-sm">
-                        {customer.total_pending}
-                      </td>
-                      <td className="whitespace-nowrap bg-white px-4 py-5 text-sm group-first-of-type:rounded-md group-last-of-type:rounded-md">
-                        {customer.total_paid}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                  <td className="whitespace-nowrap px-6 py-5">
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                      {customer.total_invoices} invoices
+                    </span>
+                  </td>
+
+                  <td className="whitespace-nowrap px-6 py-5 font-medium text-green-600">
+                    {customer.total_paid}
+                  </td>
+
+                  <td className="whitespace-nowrap px-6 py-5 font-medium text-orange-500">
+                    {customer.total_pending}
+                  </td>
+
+                  {/* Desktop actions */}
+                  <td className="whitespace-nowrap px-6 py-5">
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/dashboard/invoices?query=${encodeURIComponent(customer.name)}`}
+                        className="font-medium text-blue-600 hover:text-blue-800"
+                      >
+                        View invoices →
+                      </Link>
+
+                      <DeleteCustomerButton
+                        customerId={customer.id}
+                        customerName={customer.name}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+
+        {/* Empty state */}
+        {customers.length === 0 && (
+          <div className="px-6 py-12 text-center">
+            <p className="font-medium text-gray-900">
+              No customers found
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              Try another search or add a new customer.
+            </p>
+
+            <Link
+              href="/dashboard/customers/create"
+              className="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+            >
+              + Add Customer
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
