@@ -1,14 +1,23 @@
 
 'use server';
 
+import { auth, signIn } from '@/auth';
 import { z } from 'zod';
 import postgres from 'postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
 
 const sql = postgres(process.env.POSTGRES_URL!);
+
+// Require an authenticated user before modifying database records.
+async function requireAuth() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect('/login');
+  }
+}
 
 // State returned by the invoice actions
 export type State = {
@@ -72,6 +81,8 @@ export async function createInvoice(
   prevState: State,
   formData: FormData,
 ) {
+  await requireAuth();
+
   const validatedFields = CreateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
@@ -124,6 +135,8 @@ export async function updateInvoice(
   prevState: State,
   formData: FormData,
 ) {
+  await requireAuth();
+
   const validatedFields = UpdateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
@@ -174,6 +187,8 @@ export async function updateInvoice(
 
 // Delete an invoice
 export async function deleteInvoice(id: string) {
+  await requireAuth();
+
   await sql`
     DELETE FROM invoices
     WHERE id = ${id}
@@ -232,6 +247,8 @@ export async function createCustomer(
   prevState: CustomerState,
   formData: FormData,
 ) {
+  await requireAuth();
+
   const validatedFields = CustomerFormSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
@@ -280,6 +297,8 @@ export async function deleteCustomer(
   prevState: DeleteCustomerState,
   formData: FormData,
 ): Promise<DeleteCustomerState> {
+  await requireAuth();
+
   const validatedId = z.string().uuid().safeParse(formData.get('id'));
 
   if (!validatedId.success) {
