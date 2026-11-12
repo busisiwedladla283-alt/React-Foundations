@@ -262,8 +262,11 @@ export async function createCustomer(
     };
   }
 
+  // Refresh pages that display customer information
   revalidatePath('/dashboard/customers');
   revalidatePath('/dashboard');
+  revalidatePath('/dashboard/invoices');
+  revalidatePath('/dashboard/invoices/create');
 
   redirect('/dashboard/customers');
 }
